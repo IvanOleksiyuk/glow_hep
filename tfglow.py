@@ -410,9 +410,9 @@ class Glow(composition.Composition):
       this_nchan = sum(self._blockwise_splits[i][0:2])
       this_input_shape = (h // 2**n * 2**i, w // 2**n * 2**i, this_nchan)
 
-      glow_chain.append(invert.Invert(ExitBijector(current_shape,
-                                                   self._blockwise_splits[i],
-                                                   exit_bijector_fn)))
+      #glow_chain.append(invert.Invert(ExitBijector(current_shape,
+      #                                             self._blockwise_splits[i],
+      #                                             exit_bijector_fn)))
 
       glow_block = GlowBlock(input_shape=this_input_shape,
                              num_steps=nsteps,

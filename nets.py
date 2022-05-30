@@ -59,7 +59,7 @@ class GlowDefaultExitNetwork(tfk.Sequential):
         tfkl.Input(input_shape),
         conv(this_nchan, kernel_shape)])
     
-    
+REG=1e-3
 class ResnetGlowNetwork(tfk.Model):
     """IOIOIOIOIOIOIOIOIOIOIOIOIO
     Resnet architecture simmilar to one in the kmkolasinski implementation 
@@ -78,23 +78,31 @@ class ResnetGlowNetwork(tfk.Model):
         
         x=tfkl.Conv2D(num_hidden, kernel_shape, padding='same',
                         kernel_initializer=tf.initializers.he_normal(),
-                        activation='elu')(x)
+                        activation='relu',
+                        kernel_regularizer=tfk.regularizers.L2(REG),
+                        bias_regularizer=tfk.regularizers.L2(REG))(x)
         x=tfkl.Conv2D(num_hidden, 1, padding='same',
                         kernel_initializer=tf.initializers.he_normal(),
-                        activation='elu')(x)
+                        activation='relu')(x)
         #blocks with skip connections
         for i in range(resnet_blocks-1):
             x_input=x
             x=tfkl.Conv2D(num_hidden, kernel_shape, padding='same',
                         kernel_initializer=tf.initializers.he_normal(),
-                        activation='elu')(x_input)
+                        activation='relu',
+                        kernel_regularizer=tfk.regularizers.L2(REG),
+                        bias_regularizer=tfk.regularizers.L2(REG))(x_input)
             x=tfkl.Conv2D(num_hidden, 1, padding='same',
                         kernel_initializer=tf.initializers.he_normal(),
-                        activation='elu')(x)
+                        activation='relu',
+                        kernel_regularizer=tfk.regularizers.L2(REG),
+                        bias_regularizer=tfk.regularizers.L2(REG))(x)
             x = tfkl.Add()([x, x_input])
         
         outputs=tfkl.Conv2D(this_nchan, kernel_shape, padding='same',
-                    kernel_initializer=tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.0001, seed=None),
-                    bias_initializer=tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.0001, seed=None))(x)        
+                    kernel_initializer=tfk.initializers.VarianceScaling(scale=0.0001),
+                    bias_initializer=tfk.initializers.VarianceScaling(scale=0.0001),
+                    kernel_regularizer=tfk.regularizers.L2(REG),
+                    bias_regularizer=tfk.regularizers.L2(REG))(x)        
         
         super(ResnetGlowNetwork, self).__init__(inputs, outputs)

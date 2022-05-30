@@ -36,8 +36,6 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from nets import GlowDefaultNetwork, GlowDefaultExitNetwork, GlowDefaultExitNetwork, ResnetGlowNetwork 
-from affine_coupling import AffineCouplingTanh
 
 tfk = tf.keras
 tfkl = tfk.layers
@@ -625,14 +623,17 @@ class GlowBlock(composition.Composition):
 
     for j in range(num_steps):  # pylint: disable=unused-variable
 
-
+      this_layer_input_shape = input_shape[:-1] + (input_shape[-1] // 2,)
+      this_layer = coupling_bijector_fn(this_layer_input_shape)
+      bijector_fn = self.make_bijector_fn(this_layer)
 
       # For each step in the block, we do (optional) actnorm, followed
       # by an invertible 1x1 convolution, then affine coupling.
-      this_rnvp = invert.Invert(AffineCouplingTanh(input_shape, coupling_bijector_fn))
+      this_rnvp = invert.Invert(
+          real_nvp.RealNVP(this_nchan // 2, bijector_fn=bijector_fn))
 
       # Append the layer to the realNVP bijector for variable tracking.
-      #this_rnvp.coupling_bijector_layer = this_layer
+      this_rnvp.coupling_bijector_layer = this_layer
       rnvp_block.append(this_rnvp)
 
       rnvp_block.append(
@@ -668,7 +669,6 @@ class GlowBlock(composition.Composition):
       if isinstance(possible_output, bijector.Bijector):
         output = possible_output
       elif isinstance(possible_output, tf.Tensor):
-        print("bilector_fn was actually needed")
         input_shape = inputs.get_shape().as_list()
         output_shape = possible_output.get_shape().as_list()
         assert input_shape[:-1] == output_shape[:-1]
@@ -839,4 +839,56 @@ class Expand(composition.Composition):
         parameters=parameters)
 
 
+class GlowDefaultNetwork(tfk.Sequential):
+  """Default network for the glow bijector.
 
+  This builds a 3 layer convolutional network, with relu activation functions
+  and he_normal initializer. The first and third layers have default kernel
+  shape of 3, and the second layer is a 1x1 convolution. This is the setup
+  in the public version of Glow.
+
+  The output of the convolutional network defines the components of an Affine
+  transformation (i.e. y = m * x + b), where m, x, and b are all tensors of
+  the same shape, and * indicates elementwise multiplication.
+  """
+
+  def __init__(self, input_shape, num_hidden=400, kernel_shape=3):
+    """Default network for glow bijector."""
+    # Default is scale and shift, so 2c outputs.
+    this_nchan = input_shape[-1] * 2
+    conv_last = functools.partial(
+        tfkl.Conv2D,
+        padding='same',
+        kernel_initializer=tf.initializers.zeros(),
+        bias_initializer=tf.initializers.zeros())
+    super(GlowDefaultNetwork, self).__init__([
+        tfkl.Input(shape=input_shape),
+        tfkl.Conv2D(num_hidden, kernel_shape, padding='same',
+                    kernel_initializer=tf.initializers.he_normal(),
+                    activation='relu'),
+        tfkl.Conv2D(num_hidden, 1, padding='same',
+                    kernel_initializer=tf.initializers.he_normal(),
+                    activation='relu'),
+        conv_last(this_nchan, kernel_shape)
+    ])
+
+
+class GlowDefaultExitNetwork(tfk.Sequential):
+  """Default network for the glow exit bijector.
+
+  This is just a single convolutional layer.
+  """
+
+  def __init__(self, input_shape, output_chan, kernel_shape=3):
+    """Default network for glow bijector."""
+    # Default is scale and shift, so 2c outputs.
+    this_nchan = output_chan * 2
+    conv = functools.partial(
+        tfkl.Conv2D,
+        padding='same',
+        kernel_initializer=tf.initializers.zeros(),
+        bias_initializer=tf.initializers.zeros())
+
+    super(GlowDefaultExitNetwork, self).__init__([
+        tfkl.Input(input_shape),
+        conv(this_nchan, kernel_shape)])

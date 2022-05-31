@@ -28,7 +28,6 @@ from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import real_nvp
 from tensorflow_probability.python.bijectors import reshape
 from tensorflow_probability.python.bijectors import scale
-from tensorflow_probability.python.bijectors import scale_matvec_lu
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import transpose
 from tensorflow_probability.python.internal import dtype_util
@@ -37,7 +36,9 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from nets import GlowDefaultNetwork, GlowDefaultExitNetwork, GlowDefaultExitNetwork, ResnetGlowNetwork 
+
 from affine_coupling import AffineCouplingTanh
+from invertible1x1conv import OneByOneConv
 
 tfk = tf.keras
 tfkl = tfk.layers
@@ -699,64 +700,6 @@ class GlowBlock(composition.Composition):
       return output
 
     return bijector_fn
-
-
-class OneByOneConv(bijector.Bijector):
-  """The 1x1 Conv bijector used in Glow.
-
-  This class has a convenience function which initializes the parameters
-  of the bijector.
-  """
-
-  def __init__(self, event_size, seed=None, dtype=tf.float32,
-               name='OneByOneConv', **kwargs):
-    parameters = dict(locals())
-    with tf.name_scope(name) as bijector_name:
-      lower_upper, permutation = self.trainable_lu_factorization(
-          event_size, seed=seed, dtype=dtype)
-      self._bijector = scale_matvec_lu.ScaleMatvecLU(
-          lower_upper, permutation, **kwargs)
-      super(OneByOneConv, self).__init__(
-          dtype=self._bijector.lower_upper.dtype,
-          is_constant_jacobian=True,
-          forward_min_event_ndims=1,
-          parameters=parameters,
-          name=bijector_name)
-
-  def forward(self, x):
-    return self._bijector.forward(x)
-
-  def inverse(self, y):
-    return self._bijector.inverse(y)
-
-  def inverse_log_det_jacobian(self, y, event_ndims=None):
-    return self._bijector.inverse_log_det_jacobian(y, event_ndims)
-
-  def forward_log_det_jacobian(self, x, event_ndims=None):
-    return self._bijector.forward_log_det_jacobian(x, event_ndims)
-
-  @staticmethod
-  def trainable_lu_factorization(event_size,
-                                 seed=None,
-                                 dtype=tf.float32,
-                                 name=None):
-    with tf.name_scope(name or 'trainable_lu_factorization'):
-      event_size = tf.convert_to_tensor(
-          event_size, dtype_hint=tf.int32, name='event_size')
-      random_matrix = tf.random.uniform(
-          shape=[event_size, event_size],
-          dtype=dtype,
-          seed=seed)
-      random_orthonormal = tf.linalg.qr(random_matrix)[0]
-      lower_upper, permutation = tf.linalg.lu(random_orthonormal)
-      lower_upper = tf.Variable(
-          initial_value=lower_upper, trainable=True, name='lower_upper')
-      # Initialize a non-trainable variable for the permutation indices so
-      # that its value isn't re-sampled from run-to-run.
-      permutation = tf.Variable(
-          initial_value=permutation, trainable=False, name='permutation')
-      return lower_upper, permutation
-
 
 class ActivationNormalization(bijector.Bijector):
   """Bijector to implement Activation Normalization (ActNorm)."""

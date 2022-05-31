@@ -106,3 +106,58 @@ class ResnetGlowNetwork(tfk.Model):
                     bias_regularizer=tfk.regularizers.L2(REG))(x)        
         
         super(ResnetGlowNetwork, self).__init__(inputs, outputs)
+        
+        
+class Resnet2GlowNetwork(tfk.Model):
+    """IOIOIOIOIOIOIOIOIOIOIOIOIO
+    Resnet architecture simmilar to one in the kmkolasinski implementation 
+    """
+
+    def __init__(self, input_shape, output_nchan=None, num_filters=None, kernel_shape=3, resnet_blocks=3, units_factor=2, skip_connection=True):
+        """Default network for glow bijector."""
+        # Default is scale and shift, so 2c outputs.
+        if output_nchan is None:
+            output_nchan = input_shape[-1] * 2
+        inputs = tfkl.Input(shape=input_shape)
+        x=inputs
+        
+        if num_filters is None:
+            num_filters=output_nchan*units_factor
+        
+        #blocks with skip connections
+        for i in range(resnet_blocks):
+            x_input=x
+            
+            x = tfkl.Conv2D(num_filters, kernel_shape, padding='same',
+                        kernel_initializer=tf.initializers.he_normal(),
+                        activation=None,
+                        kernel_regularizer=tfk.regularizers.L2(REG),
+                        bias_regularizer=tfk.regularizers.L2(REG))(x_input)
+            x = tfkl.LeakyReLU()(x)
+            x = tfkl.Conv2D(num_filters, 1, padding='same',
+                        kernel_initializer=tf.initializers.he_normal(),
+                        activation=None,
+                        kernel_regularizer=tfk.regularizers.L2(REG),
+                        bias_regularizer=tfk.regularizers.L2(REG))(x)
+            
+            
+            if skip_connection:
+                if num_filters != input_shape[-1]:
+                    x_input = tfkl.Conv2D(num_filters, kernel_size=1,
+                        kernel_initializer=tf.initializers.he_normal(),
+                        activation=None,
+                        kernel_regularizer=tfk.regularizers.L2(REG),
+                        bias_regularizer=tfk.regularizers.L2(REG))(x_input)
+                    x_input = tfkl.PReLU()(x_input)
+                x = tfkl.Add()([x, x_input])
+            x = tfkl.LeakyReLU()(x)
+        
+        outputs=tfkl.Conv2D(output_nchan, kernel_shape, padding='same',
+                    kernel_initializer=tfk.initializers.VarianceScaling(scale=0.0001),
+                    bias_initializer=tfk.initializers.VarianceScaling(scale=0.0001),
+                    kernel_regularizer=tfk.regularizers.L2(REG),
+                    bias_regularizer=tfk.regularizers.L2(REG))(x)        
+        
+        super(Resnet2GlowNetwork, self).__init__(inputs, outputs)
+        
+    

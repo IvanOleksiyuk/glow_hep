@@ -12,9 +12,12 @@ MAX_SCALE=2.
 TANH_LINEARITY_SCALE=0.2
 
 class AffineCouplingTanh(tfb.Bijector):
+    """IOIOIOIOIOIOIOIOIOIOIOIOIO
+    My implementation of the AffineCoupling bijector. Code inspired by many different implementaions
+    """
     def __init__(self, input_shape, coupling_fn=None, name='affine_coupling', bayesian=False,  **kwargs):
         super(AffineCouplingTanh, self).__init__(
-            inverse_min_event_ndims=1,
+            inverse_min_event_ndims=3,
             is_constant_jacobian=False,
             name=name,
             **kwargs)

@@ -38,7 +38,7 @@ from tensorflow_probability.python.util.seed_stream import SeedStream
 from nets import GlowDefaultNetwork, GlowDefaultExitNetwork, GlowDefaultExitNetwork, ResnetGlowNetwork 
 
 from affine_coupling import AffineCouplingTanh
-from invertible1x1conv import OneByOneConv
+from invertible1x1conv import OneByOneConv, Invertible1x1conv
 
 tfk = tf.keras
 tfkl = tfk.layers
@@ -637,8 +637,7 @@ class GlowBlock(composition.Composition):
       rnvp_block.append(this_rnvp)
 
       rnvp_block.append(
-          invert.Invert(OneByOneConv(
-              this_nchan, seed=seedstream(),
+          invert.Invert(Invertible1x1conv(input_shape,
               dtype=dtype_util.common_dtype(this_rnvp.variables,
                                             dtype_hint=tf.float32))))
 

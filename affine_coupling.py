@@ -59,7 +59,7 @@ class AffineCouplingTanh(tfb.Bijector):
         trafo_params = self.model(y[..., :self.inp_chans])
         log_scale = trafo_params[..., :self.cha_chans]
         log_scale = MAX_SCALE * tf.tanh(TANH_LINEARITY_SCALE * log_scale)
-        log_det = -tf.reduce_sum(log_scale, axis=(-1))
+        log_det = -tf.reduce_sum(log_scale, axis=(-1, -2, -3))
         #further reduction is done via reduce_jacobian_det_over_shape inhereted by all bijectors
         return log_det
 
@@ -67,6 +67,6 @@ class AffineCouplingTanh(tfb.Bijector):
         trafo_params = self.model(x[..., :self.inp_chans])
         log_scale = trafo_params[..., :self.cha_chans]
         log_scale = MAX_SCALE * tf.tanh(TANH_LINEARITY_SCALE * log_scale)
-        log_det = tf.reduce_sum(log_scale, axis=(-1))
+        log_det = tf.reduce_sum(log_scale, axis=(-1, -2, -3))
         #further reduction is done via reduce_jacobian_det_over_shape inhereted by all bijectors
         return log_det
